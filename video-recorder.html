@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen and Audio Recording Tool</title>
+    <style>
+        video {
+            width: 100%;
+            max-width: 500px;
+            border: 2px solid black;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Screen and Audio Recording Tool</h1>
+    <video id="screenFeed" autoplay></video>
+    <video id="recordedVideo" controls style="display: none;"></video>
+    <p>Press <strong>Ctrl + Shift + R</strong> to start recording and <strong>Ctrl + Shift + S</strong> to stop recording.</p>
+
+    <script>
+        const screenFeed = document.getElementById('screenFeed');
+        const recordedVideo = document.getElementById('recordedVideo');
+
+        let screenStream;
+        let audioStream;
+        let mediaRecorder;
+        let recordedChunks = [];
+
+        // Start recording the screen with audio
+        async function startRecording() {
+            try {
+                // Get audio from microphone
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                // Get video from screen
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+
+                // Combine audio and video streams
+                const combinedStream = new MediaStream([
+                    ...screenStream.getVideoTracks(),
+                    ...audioStream.getAudioTracks(),
+                ]);
+
+                screenFeed.srcObject = screenStream;
+
+                // Create a MediaRecorder for the combined stream
+                mediaRecorder = new MediaRecorder(combinedStream);
+                
+                // Event handler for when data is available
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                // Start recording
+                mediaRecorder.start();
+                console.log("Recording started...");
+            } catch (err) {
+                console.error('Error: ' + err);
+                alert('Failed to capture screen: ' + err.message);
+            }
+        }
+
+        // Stop recording
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                console.log("Recording stopped.");
+
+                mediaRecorder.onstop = () => {
+                    // Create a Blob from the recorded chunks
+                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    recordedVideo.src = URL.createObjectURL(blob);
+                    recordedVideo.style.display = 'block'; // Show recorded video
+                    recordedChunks = []; // Clear the chunks for the next recording
+                };
+            }
+        }
+
+        // Listen for keyboard shortcuts
+        document.addEventListener('keydown', function (event) {
+            if (event.ctrlKey && event.shiftKey) {
+                if (event.key === 'L') {
+                    startRecording(); // Start recording
+                } else if (event.key === 'S') {
+                    stopRecording(); // Stop recording
+                }
+            }
+        });
+    </script>
+
+</body>
+</html>
